@@ -1,170 +1,93 @@
-# FanumTaxxed — Deployment Sheet
+# DEPLOY — FanumTaxxed
 
-**Read this fully before touching anything.** This sheet is written for an
-autonomous agent that controls the user's browser and computer. The goal:
-deploy this app to **Vercel** and **Cloudflare Workers** (GitHub optional but
-recommended) **without any help from the user**.
+Autonomous deployment sheet. The app is **pure static files** (HTML + CSS + vanilla JS).
+**No env vars. No secrets. No database. No build step.** Any agent (or human) can deploy it
+with one of the three options below.
 
-The app is 100% client-side: **no database, no API routes, no environment
-variables, no secrets, no server code.** One build command emits the whole
-site into `out/`. That is all any host needs.
+## Files to deploy
 
----
-
-## 0. What you have
-
-| Artifact | What it is | Use it for |
-|---|---|---|
-| `fanumtaxxed-src.zip` | Full source repo (this folder minus build junk) | GitHub, Vercel, Workers-from-source |
-| `fanumtaxxed-static.zip` | **Prebuilt** site (`index.html` + assets) + its own `wrangler.toml` | Fastest Cloudflare deploy, drag-drop hosts |
-| repo folder itself | same as src zip | if you already have the checkout |
-
-Build from source (only if using the src zip):
-
-```bash
-cd <repo-root>            # the folder that contains package.json
-npm install               # or: bun install  (much faster; bun.lock is included)
-npm run build             # emits the static site into ./out
-npx serve@latest out      # local preview → http://localhost:3000
+```
+index.html    style.css    app.js    calc.js    solver.js    items.js    .nojekyll
 ```
 
-Requirements: Node 18+ (check `node -v`). That's it.
+Optional (only for Cloudflare CLI): `wrangler.toml`.
+Optional (only for Vercel CLI): `vercel.json` — not required; Vercel serves the folder as-is.
 
 ---
 
-## 1. GitHub (recommended first — makes Vercel one-click)
+## Option A — GitHub Pages (current live host)
 
-**CLI path** (if `gh` is authenticated — check with `gh auth status`):
+The repo `UrbishCodes/sales-n-taxes` already serves GitHub Pages at
+<https://urbishcodes.github.io/sales-n-taxes/>.
 
 ```bash
-cd <repo-root>
-git init -b main
+git clone https://github.com/UrbishCodes/sales-n-taxes.git
+cd sales-n-taxes
+# REPLACE these files with the new build:
+#   index.html  style.css  app.js  solver.js  items.js  README.md  .nojekyll
+# ADD these new files:
+#   calc.js  DEPLOY.md  wrangler.toml  vercel.json
 git add -A
-git commit -m "FanumTaxxed — sales VAT calc + FANUM-991ES PLUS calculator"
-gh repo create fanumtaxxed --public --source=. --remote=origin --push
+git commit -m "FanumTaxxed: restore auto-adjust engine (user edits never reverted), fix VAT-space trap, recalibrate band, merge duplicate item, FNT-991ES PLUS calculator"
+git push origin main
 ```
 
-**Browser path** (no CLI): github.com → click **New repository** → name
-`fanumtaxxed` → Public → Create → on the empty-repo page click
-**"uploading an existing file"** → drag the CONTENTS of the repo folder
-(all files and folders, not the folder itself) → **Commit changes**.
+GitHub Pages deploys automatically on push (Settings → Pages → Branch: `main` / root).
+Verify after ~1 minute: the header says **FanumTaxxed**, and the Items card shows the
+**Auto-adjust** switch, ON.
 
-If the user's browser has no GitHub session, pause and ask the user to log in
-once — this is the only place a login may be needed.
+## Option B — Vercel
 
----
-
-## 2. Vercel
-
-**Path A — import from GitHub (recommended, auto-redeploys on every push):**
-
-1. vercel.com (log in — GitHub login is fastest if the session exists)
-2. **Add New… → Project**
-3. **Import** the `fanumtaxxed` repository
-4. Framework Preset: **Next.js** (auto-detected). Leave Build Command,
-   Output Directory, and Install Command **untouched** — the repo's
-   `next.config.ts` already sets `output: "export"`, which Vercel honors
-   automatically.
-5. Click **Deploy** (~1–2 min). Copy the `https://fanumtaxxed.vercel.app`
-   URL.
-6. Optional custom domain: Project → Settings → Domains.
-
-**Path B — CLI (no GitHub needed):**
+CLI (logged-in machine):
 
 ```bash
 npm i -g vercel
-vercel login                # opens the browser; complete the login
-cd <repo-root>
-vercel --prod               # answers: scope → your team · link project → N
-                            #          project name → fanumtaxxed · directory → ./
+cd <folder containing index.html>
+vercel deploy --prod        # accept defaults ("Other" framework, no build command, output ./)
 ```
 
-If Vercel's wizard asks for an output directory (only if the preset was
-"Other"), answer **`out`**.
+Dashboard (no CLI):
 
----
+1. Go to <https://vercel.com/new>
+2. Drag the folder onto the page (or import the GitHub repo).
+3. Framework preset: **Other**. Build command: *(empty)*. Output directory: `./`
+4. Deploy. Nothing else to configure — there are no environment variables.
 
-## 3. Cloudflare Workers
+## Option C — Cloudflare Workers (Static Assets)
 
-**Path A — from the prebuilt static zip (fastest, no Node build):**
+CLI:
 
 ```bash
-unzip fanumtaxxed-static.zip -d fanumtaxxed-static
-cd fanumtaxxed-static              # contains index.html + wrangler.toml (directory = ".")
-npx wrangler@latest login          # opens browser OAuth → allow
-npx wrangler@latest deploy         # prints: https://fanumtaxxed.<subdomain>.workers.dev
+npm i -g wrangler
+cd <folder containing wrangler.toml and the site files>
+wrangler login              # one-time browser consent
+wrangler deploy
 ```
 
-**Path B — from source:**
+`wrangler.toml` (already in this folder):
 
-```bash
-cd <repo-root>
-npx wrangler@latest login
-npm run deploy:workers             # = next build + wrangler deploy (uses ./out)
+```toml
+name = "fanumtaxxed"
+compatibility_date = "2024-11-01"
+[assets]
+directory = "."
 ```
 
-**Path C — dashboard only (no CLI at all):**
+Dashboard (no CLI):
 
-1. dash.cloudflare.com → **Workers & Pages** → **Create application**
-2. **Pages** tab → **Upload assets** (Direct Upload)
-3. Drag the **unzipped static folder** (the one containing `index.html`)
-4. **Deploy** → get the `*.pages.dev` URL.
-   (Pages is Cloudflare's static host — same result, different URL shape.
-   Prefer Paths A/B if the user specifically wants a *Workers* URL.)
+1. Workers & Pages → Create → **Workers** → "Upload assets" (or Pages → Direct Upload).
+2. Upload the folder. Route/URL is assigned automatically.
 
-**If the workers.dev URL returns 404:** dash → Workers & Pages →
-`fanumtaxxed` → **Settings → Domains & Routes** → enable the
-**workers.dev** route → retry.
+## Post-deploy smoke test (60 seconds)
 
----
-
-## 4. Post-deploy verification checklist
-
-Open the deployed URL and check:
-
-- [ ] Title / header says **FanumTaxxed** (not URB VATCalc); favicon is the
-      little yellow calculator stamp
-- [ ] Footer shows **"designed & developed by Urbish"** with working links to
-      github.com/UrbishCodes and linkedin.com/in/urbish
-- [ ] Opens on **SALES** view, **NON-REVERSE** mode active (default)
-- [ ] **The input fix:** PCS mode — type a rate (e.g. 45) with qty 4 → the
-      base follows to 180 and **the typed rate never reverts**; type a qty →
-      the amounts follow; type the base (200) → the rate absorbs to 50
-- [ ] Tidy chips appear after auto-adjust (e.g. "5 pcs · rate 40") and apply
-      on click, keeping the base
-- [ ] KG: base 1000 + rate 7 → qty solves (≈142.857); touch qty then edit the
-      base → the **rate** absorbs instead (sticky)
-- [ ] DOZEN: qty snaps to half-dozen steps (1.3 → 1.5); base 90 → rate 60
-- [ ] REVERSE mode: type incl.-VAT total 226 → base 200 at 13%
-- [ ] Side button opens the **FANUM-991ES PLUS** calculator: type `5 + 5` →
-      live preview `10` before pressing `=`; `=` saves to history
-- [ ] **The four arrow keys (▲▼◀▶)** are separate, easy-to-click buttons in a
-      cross pad where the old circular dial was — ◀ ▶ move the cursor, ▲ ▼
-      step through history; each plays its own distinct pip sound
-- [ ] The calculator's bottom edge reads "FANUM-991ES PLUS · TWO WAY POWER ·
-      DESIGNED BY URBISH" (the credit links to GitHub)
-- [ ] `+VAT` key: 100 → 113 at 13%; the VAT rate is shared with the sales view
-- [ ] Reload → histories persist (per-device localStorage)
-- [ ] Phone: pinch-zoom disabled, page fits the viewport
-
-## 5. Updating later
-
-- **Vercel (GitHub path):** edit files → `git add -A && git commit -m "…" && git push` → auto-redeploys.
-- **Vercel (CLI path):** `vercel --prod` again.
-- **Workers:** `npm run deploy:workers` (or re-run Path A from a fresh static zip).
-- **Pages (drag-drop):** drag the new folder again.
-
-## 6. Troubleshooting
-
-| Symptom | Fix |
-|---|---|
-| `wrangler` errors about assets | Use `npx wrangler@latest deploy` (old cached versions lack Static Assets) |
-| `npm install` slow/fails | Use `bun install` (bun.lock included) |
-| Vercel preset asked for Output Directory | Answer `out` |
-| workers.dev 404 | Enable the workers.dev route (see §3) |
-| Fonts look plain | Google Fonts CDN is blocked/slow on the visitor's network — the app falls back gracefully; not a deployment issue |
-| Sounds don't play before first click | Browser autoplay policy — the app unlocks audio on the first tap by design |
-
-**Never** ask the user for API keys, database URLs, or env vars — there are
-none. The only interactive step that may need the user is a website login
-(GitHub / Vercel / Cloudflare) if no browser session exists.
+1. Header shows **FanumTaxxed**; footer credits Urbish with GitHub + LinkedIn links.
+2. Items card: **Auto-adjust** switch is ON; line card shows the **AMOUNTS — LINKED** section;
+   the **SALES CALC — NON-REV · 13%** card sits directly after the Items card.
+3. The user scenario: pick `Mobile Cover #810` (doz, max 867, buy 810), type rate **870**,
+   then type **42473** into GROSS — INCL. VAT. Expect: count **43**, message
+   "Typed rate NPR 870.00 → 43 doz @ NPR 874.11 (rate absorbs)", status **Exact**, VAT 4,886.27.
+4. Type a different count (say 44) — it must stay exactly what you typed; only the rate moves.
+5. Calculator: type `465893` fast — every digit registers (pointerdown path). SOUND is on,
+   VOICE is off by default. `37586.70` → `−VAT` → `Use as bill total` (REV mode) must set
+   **37,586.70**, not 33,262.57 (BASE badge shows on the LCD after −VAT).
+6. Item search: typing `screen protrector #25` finds the single merged entry (stock 6,008).
